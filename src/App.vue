@@ -33,7 +33,6 @@ function sendMessage() {
 function addEmoji(emoji) { draft.value += emoji }
 function avatarFor(role) { return role === 'sender' ? sender.value.avatar : receiver.value.avatar }
 function avatarImageFor(role) { return role === 'sender' ? sender.value.image : receiver.value.image }
-function nameFor(role) { return role === 'sender' ? sender.value.name : receiver.value.name }
 function chooseAvatar() { avatarInput.value?.click() }
 function uploadAvatar(event) {
   const file = event.target.files?.[0]
@@ -95,7 +94,7 @@ async function exportImage() {
               <div v-if="message.showTime" class="time-divider">{{ message.time }}</div>
               <div class="message-row" :class="message.role">
                 <div class="avatar"><img v-if="avatarImageFor(message.role)" :src="avatarImageFor(message.role)" alt="" /><span v-else>{{ avatarFor(message.role) }}</span></div>
-                <div class="message-content"><span class="message-name">{{ nameFor(message.role) }}</span><div class="bubble">{{ message.text }}</div></div>
+                <div class="message-content"><div class="bubble">{{ message.text }}</div></div>
               </div>
             </template>
           </div>
