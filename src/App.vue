@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { toPng } from 'html-to-image'
 
 const platform = ref('ios')
 const sender = ref({ name: '小林', avatar: '🧑🏻‍💻', image: '' })
@@ -9,6 +10,8 @@ const draft = ref('')
 const emojiOpen = ref(false)
 const voiceMode = ref(false)
 const avatarInput = ref(null)
+const phonePreview = ref(null)
+const exporting = ref(false)
 const messages = ref([
   { role: 'receiver', text: '嗨！这是一个公众号聊天界面 Demo 👋', time: '10:24', showTime: true },
   { role: 'sender', text: '看起来很不错，我们开始吧！', time: '10:25', showTime: false },
@@ -39,6 +42,27 @@ function uploadAvatar(event) {
   activeProfile.value.image = URL.createObjectURL(file)
   event.target.value = ''
 }
+async function exportImage() {
+  if (!phonePreview.value || exporting.value) return
+  exporting.value = true
+  try {
+    const dataUrl = await toPng(phonePreview.value, {
+      pixelRatio: 3,
+      cacheBust: true,
+      backgroundColor: '#ededeb',
+    })
+    const link = document.createElement('a')
+    const safeName = receiver.value.name.trim().replace(/[\\/:*?"<>|]/g, '-') || '聊天'
+    link.download = `${safeName}-微信聊天.png`
+    link.href = dataUrl
+    link.click()
+  } catch (error) {
+    window.alert('图片导出失败，请重试。')
+    console.error(error)
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -55,7 +79,7 @@ function uploadAvatar(event) {
 
     <section class="workspace">
       <div class="phone-wrap">
-        <div class="phone" :class="platform">
+        <div ref="phonePreview" class="phone" :class="platform">
           <div class="status-bar">
             <span class="status-time">9:41</span>
             <div class="status-icons" aria-label="手机状态">
@@ -102,6 +126,10 @@ function uploadAvatar(event) {
         <label>或使用 Emoji<input v-model="activeProfile.avatar" maxlength="2" /></label>
         <label>显示昵称<input v-model="activeProfile.name" maxlength="10" /></label>
         <div class="hint">点击下方发送方 / 接收方切换编辑对象，修改会即时反映在预览中。</div>
+        <button class="export-btn" :disabled="exporting" @click="exportImage">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 16v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+          {{ exporting ? '正在生成图片…' : '导出聊天图片' }}
+        </button>
         <div class="feature-list"><div><span>✦</span><p><b>真实聊天体验</b><small>支持文字、Emoji 与时间戳</small></p></div><div><span>◉</span><p><b>双端 UI 适配</b><small>一键切换 iOS / Android 风格</small></p></div><div><span>⌁</span><p><b>轻量易部署</b><small>Vite 构建，可直接部署到 Cloudflare</small></p></div></div>
       </aside>
     </section>
