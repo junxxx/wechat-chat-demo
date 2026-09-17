@@ -2,14 +2,17 @@
 import { computed, ref } from 'vue'
 
 const platform = ref('ios')
-const sender = ref({ name: '小林', avatar: '🧑🏻‍💻' })
-const receiver = ref({ name: '阿禾', avatar: '🌿' })
+const sender = ref({ name: '小林', avatar: '🧑🏻‍💻', image: '' })
+const receiver = ref({ name: '阿禾', avatar: '🌿', image: '' })
 const activeRole = ref('sender')
 const draft = ref('')
 const emojiOpen = ref(false)
+const voiceMode = ref(false)
+const avatarInput = ref(null)
 const messages = ref([
-  { role: 'receiver', text: '嗨！这是一个公众号聊天界面 Demo 👋', time: '10:24' },
-  { role: 'sender', text: '看起来很不错，我们开始吧！', time: '10:25' },
+  { role: 'receiver', text: '嗨！这是一个公众号聊天界面 Demo 👋', time: '10:24', showTime: true },
+  { role: 'sender', text: '看起来很不错，我们开始吧！', time: '10:25', showTime: false },
+  { role: 'receiver', text: '头像和昵称都可以自由设置啦 ✨', time: '10:32', showTime: true },
 ])
 const emojis = ['😀', '😂', '🥹', '😍', '🤔', '👍', '🎉', '✨', '🌿', '❤️']
 
@@ -17,13 +20,25 @@ const activeProfile = computed(() => activeRole.value === 'sender' ? sender.valu
 function sendMessage() {
   const text = draft.value.trim()
   if (!text) return
-  messages.value.push({ role: activeRole.value, text, time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) })
+  const now = new Date()
+  const previous = messages.value.at(-1)
+  const time = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  messages.value.push({ role: activeRole.value, text, time, showTime: !previous || previous.time !== time })
   draft.value = ''
   emojiOpen.value = false
 }
 function addEmoji(emoji) { draft.value += emoji }
 function avatarFor(role) { return role === 'sender' ? sender.value.avatar : receiver.value.avatar }
+function avatarImageFor(role) { return role === 'sender' ? sender.value.image : receiver.value.image }
 function nameFor(role) { return role === 'sender' ? sender.value.name : receiver.value.name }
+function chooseAvatar() { avatarInput.value?.click() }
+function uploadAvatar(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  if (activeProfile.value.image.startsWith('blob:')) URL.revokeObjectURL(activeProfile.value.image)
+  activeProfile.value.image = URL.createObjectURL(file)
+  event.target.value = ''
+}
 </script>
 
 <template>
@@ -41,15 +56,33 @@ function nameFor(role) { return role === 'sender' ? sender.value.name : receiver
     <section class="workspace">
       <div class="phone-wrap">
         <div class="phone" :class="platform">
-          <div class="status-bar"><span>9:41</span><span class="status-icons">● ◔ ▮</span></div>
-          <div class="chat-nav"><span class="back">‹</span><strong>{{ receiver.name }}</strong><span class="more">···</span></div>
-          <div class="chat-body">
-            <div v-for="(message, index) in messages" :key="index" class="message-row" :class="message.role">
-              <div class="avatar">{{ avatarFor(message.role) }}</div>
-              <div class="message-content"><span class="message-name">{{ nameFor(message.role) }}</span><div class="bubble">{{ message.text }}</div><small>{{ message.time }}</small></div>
+          <div class="status-bar">
+            <span class="status-time">9:41</span>
+            <div class="status-icons" aria-label="手机状态">
+              <svg viewBox="0 0 18 12"><path d="M1 11h2V8H1zm4 0h2V5H5zm4 0h2V2H9zm4 0h2V0h-2z"/></svg>
+              <svg class="wifi" viewBox="0 0 16 12"><path d="M1 4.2A10.8 10.8 0 0 1 15 4.2M3.5 7a7 7 0 0 1 9 0M6.3 9.6a2.7 2.7 0 0 1 3.4 0"/><circle cx="8" cy="11" r="1"/></svg>
+              <span v-if="platform === 'android'" class="network">5G</span>
+              <span class="battery"><i></i></span>
             </div>
           </div>
-          <div class="composer"><button class="round-btn">＋</button><input v-model="draft" @keyup.enter="sendMessage" placeholder="输入消息..." /><button class="emoji-btn" @click="emojiOpen = !emojiOpen">☺</button><button class="send-btn" @click="sendMessage">发送</button></div>
+          <div class="chat-nav"><button class="nav-icon back" aria-label="返回"><svg viewBox="0 0 24 24"><path d="m15 4-8 8 8 8"/></svg></button><strong>{{ receiver.name }}</strong><button class="nav-icon more" aria-label="更多"><i></i><i></i><i></i></button></div>
+          <div class="chat-body">
+            <template v-for="(message, index) in messages" :key="index">
+              <div v-if="message.showTime" class="time-divider">{{ message.time }}</div>
+              <div class="message-row" :class="message.role">
+                <div class="avatar"><img v-if="avatarImageFor(message.role)" :src="avatarImageFor(message.role)" alt="" /><span v-else>{{ avatarFor(message.role) }}</span></div>
+                <div class="message-content"><span class="message-name">{{ nameFor(message.role) }}</span><div class="bubble">{{ message.text }}</div></div>
+              </div>
+            </template>
+          </div>
+          <div class="composer">
+            <button class="tool-btn" :class="{ active: voiceMode }" aria-label="切换语音输入" @click="voiceMode = !voiceMode"><svg viewBox="0 0 24 24"><path d="M8.5 8.5a5 5 0 0 1 0 7M5.5 5.5a9 9 0 0 1 0 13M12 11v2M15.5 8.5a5 5 0 0 0 0 7"/></svg></button>
+            <button v-if="voiceMode" class="voice-input">按住 说话</button>
+            <input v-else v-model="draft" @keyup.enter="sendMessage" placeholder="输入消息..." />
+            <button class="tool-btn" aria-label="选择表情" @click="emojiOpen = !emojiOpen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle class="fill" cx="9" cy="10" r="1"/><circle class="fill" cx="15" cy="10" r="1"/><path d="M8 14.5c1.1 2 6.9 2 8 0"/></svg></button>
+            <button v-if="draft" class="send-btn" @click="sendMessage">发送</button>
+            <button v-else class="tool-btn" aria-label="更多功能"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></svg></button>
+          </div>
           <div v-if="emojiOpen" class="emoji-panel"><button v-for="emoji in emojis" :key="emoji" @click="addEmoji(emoji)">{{ emoji }}</button></div>
           <div class="home-indicator"></div>
         </div>
@@ -58,7 +91,15 @@ function nameFor(role) { return role === 'sender' ? sender.value.name : receiver
       <aside class="controls">
         <div class="control-heading"><span>角色设置</span><span class="live-pill">LIVE PREVIEW</span></div>
         <div class="role-tabs"><button :class="{ selected: activeRole === 'sender' }" @click="activeRole = 'sender'">发送方</button><button :class="{ selected: activeRole === 'receiver' }" @click="activeRole = 'receiver'">接收方</button></div>
-        <label>头像 Emoji<input v-model="activeProfile.avatar" maxlength="2" /></label>
+        <div class="avatar-setting">
+          <span class="field-label">头像</span>
+          <div class="avatar-options">
+            <button class="avatar-preview" @click="chooseAvatar"><img v-if="activeProfile.image" :src="activeProfile.image" alt="当前头像" /><span v-else>{{ activeProfile.avatar }}</span><i>更换</i></button>
+            <div><button class="upload-btn" @click="chooseAvatar">上传图片</button><small>支持 JPG、PNG、WebP</small></div>
+          </div>
+          <input ref="avatarInput" class="file-input" type="file" accept="image/png,image/jpeg,image/webp" @change="uploadAvatar" />
+        </div>
+        <label>或使用 Emoji<input v-model="activeProfile.avatar" maxlength="2" /></label>
         <label>显示昵称<input v-model="activeProfile.name" maxlength="10" /></label>
         <div class="hint">点击下方发送方 / 接收方切换编辑对象，修改会即时反映在预览中。</div>
         <div class="feature-list"><div><span>✦</span><p><b>真实聊天体验</b><small>支持文字、Emoji 与时间戳</small></p></div><div><span>◉</span><p><b>双端 UI 适配</b><small>一键切换 iOS / Android 风格</small></p></div><div><span>⌁</span><p><b>轻量易部署</b><small>Vite 构建，可直接部署到 Cloudflare</small></p></div></div>
